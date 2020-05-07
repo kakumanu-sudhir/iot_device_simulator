@@ -269,6 +269,12 @@ def parse_command_line_args():
             '--asset_route',
             default='r1',
             help='geo coordinates of routes')
+    parser.add_argument(
+            '--maps_api_key',
+            default='api-Key',
+            help='enter the api key as per your user account from google')
+
+            
 
                 
     # Command subparser
@@ -465,8 +471,8 @@ def mqtt_device_demo(args, points):
 def main():
     args = parse_command_line_args()    
 
-    # maps_api_key = #ENTER YOUR API KEY FROM GOOGLE MAPS
-    raise NotImplementedError()    
+    maps_api_key = args.maps_api_key #ENTER YOUR API KEY FROM GOOGLE MAPS
+    
     src = ''
     dest = ''
 
@@ -507,10 +513,10 @@ python3 iot_device_simulator_gps.py \
    --private_key_file=rsa_private.pem \
    --message_type=event \
    --mqtt_bridge_port=8883 \
-   --algorithm=RS256 --num_messages=1000 --asset_route=r1
+   --algorithm=RS256 --num_messages=1000 --asset_route=r1 --maps_api_key=KEY_VALUE
 
    or
 
-python3 iot_device_simulator_gps.py --project_id=infringement-100 --cloud_region=us-central1 --registry_id=iotlab-registry --device_id=tempDevice --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000 --asset_route=r1 
+python3 iot_device_simulator_gps.py --project_id=infringement-100 --cloud_region=us-central1 --registry_id=iotlab-registry --device_id=tempDevice --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000 --asset_route=r1 --maps_api_key=KEY_VALUE 
 '''
 #--------------------------------
