@@ -436,7 +436,7 @@ def mqtt_device_demo(args, points):
             client.connect(args.mqtt_bridge_hostname, args.mqtt_bridge_port)
 
         max_coords = len(points)
-        cur_index = i+1 if i+1 < max_coords else max_coords
+        cur_index = i+1 if i+1 < max_coords else max_coords-1
         lat = points[cur_index][0]
         longitude = points[cur_index][1]
         # payload = '{}/{}-{}-{}-{}'.format(args.registry_id, args.device_id, lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
@@ -459,7 +459,7 @@ def mqtt_device_demo(args, points):
         # Publish "payload" to the MQTT topic. qos=1 means at least once
         # delivery. Cloud IoT Core also supports qos=0 for at most once
         # delivery.
-        client.publish(mqtt_topic, payload, qos=1)
+        client.publish(mqtt_topic, json.dumps(payload), qos=1)
 
         # Send events every second. State should not be updated as often
         for i in range(0, 3):
