@@ -476,9 +476,20 @@ def main():
     src = ''
     dest = ''
 
-    if args.asset_route.strip().find("r1") != -1:
+    asset_route = args.asset_route.strip()
+    if asset_route.find("r1") != -1:
         src = "HashedIn Technologies, Bangalore"
         dest = "Cubbon Park, Bangalore"
+    elif asset_route.find("r2") != -1:
+        src = "Indiranagar Metro Station, Bangalore"
+        dest = "PVR koramangala, Bangalore"
+    elif asset_route.find("r3") != -1:
+        src = "Tin Factory, Swami Vivekananda Rd, Bangalore"
+        dest = "Capgemini Prestige Shantiniketan Crescent 2, Bangalore"
+    elif asset_route.find("r4") != -1:
+        src = "Shivaji Military Hotel, No. 718, Bangalore"
+        dest = "Silk board bus stand, Central Silk Board Colony, Bangalore"
+
 
     points = get_points_along_path(maps_api_key, src, dest)
 
