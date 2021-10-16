@@ -402,9 +402,14 @@ if __name__ == '__main__':
 
 #--------------------------------
 '''
+
+export PROJECT_ID=cloud-arch-326918
+export MY_REGION=us-central1
+
+
 python3 iot_device_simulator_gps.py \
-   --project_id=infringement-100 \
-   --cloud_region=us-central1 \
+   --project_id=$PROJECT_ID \
+   --cloud_region=$MY_REGION \
    --registry_id=iotlab-registry \
    --device_id=tempDevice \
    --private_key_file=rsa_private.pem \
@@ -414,6 +419,6 @@ python3 iot_device_simulator_gps.py \
 
    or
 
-python3 iot_device_simulator_gps.py --project_id=infringement-100 --cloud_region=us-central1 --registry_id=iotlab-registry --device_id=tempDevice --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000
+python3 iot_device_simulator_gps.py --project_id=$PROJECT_ID --cloud_region=$MY_REGION --registry_id=iotlab-registry --device_id=tempDevice --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000
 '''
 #--------------------------------
