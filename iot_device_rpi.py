@@ -262,18 +262,7 @@ def parse_command_line_args():
             '--service_account_json',
             default=os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"),
             help='Path to service account json file.')
-    parser.add_argument(
-            '--asset_route',
-            default='r1',
-            help='geo coordinates of routes')
-    parser.add_argument(
-            '--maps_api_key',
-            default='api-Key',
-            help='enter the api key as per your user account from google')
 
-            
-
-                
     # Command subparser
     command = parser.add_subparsers(dest='command')
 
@@ -421,10 +410,10 @@ python3 iot_device_simulator_gps.py \
    --private_key_file=rsa_private.pem \
    --message_type=event \
    --mqtt_bridge_port=8883 \
-   --algorithm=RS256 --num_messages=1000 --asset_route=r1 --maps_api_key=KEY_VALUE
+   --algorithm=RS256 --num_messages=1000
 
    or
 
-python3 iot_device_simulator_gps.py --project_id=infringement-100 --cloud_region=us-central1 --registry_id=iotlab-registry --device_id=tempDevice --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000 --asset_route=r1 --maps_api_key=KEY_VALUE 
+python3 iot_device_simulator_gps.py --project_id=infringement-100 --cloud_region=us-central1 --registry_id=iotlab-registry --device_id=tempDevice --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000
 '''
 #--------------------------------
