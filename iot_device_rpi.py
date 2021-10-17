@@ -347,7 +347,7 @@ def mqtt_device(args, points):
         cur_index = i+1 if i+1 < max_coords else max_coords-1
         lat = points[cur_index][0]
         longitude = points[cur_index][1]
-        curr_cpu_temp = psutil.sensors_temperatures()['cpu-thermal'][0][1]
+        curr_cpu_temp = psutil.sensors_temperatures()['cpu_thermal'][0][1]
 
         # payload = '{}/{}-{}-{}-{}'.format(args.registry_id, args.device_id, lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
         payload = {"timestamp": time.asctime( time.localtime(time.time())),"registry":args.registry_id , "device": args.device_id, "latitude": lat, "longitude": longitude, "current_cputemp": curr_cpu_temp}                
