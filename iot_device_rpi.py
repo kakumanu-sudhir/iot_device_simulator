@@ -355,7 +355,7 @@ def mqtt_device(args, points):
                 i, args.num_messages, payload))
         # [START iot_mqtt_jwt_refresh]
         seconds_since_issue = (datetime.datetime.utcnow() - jwt_iat).seconds
-        if seconds_since_issue > 3 * jwt_exp_mins:
+        if seconds_since_issue > 4 * jwt_exp_mins:
             print('Refreshing token after {}s'.format(seconds_since_issue))
             jwt_iat = datetime.datetime.utcnow()
             client.loop()
@@ -372,8 +372,8 @@ def mqtt_device(args, points):
         client.publish(mqtt_topic, json.dumps(payload), qos=1)
 
         # Send events every second. State should not be updated as often
-        for i in range(0, 3):
-            time.sleep(1)
+        for i in range(0, 4):
+            time.sleep(3)
             client.loop()
     # [END iot_mqtt_run]
 
