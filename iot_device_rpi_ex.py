@@ -13,13 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Python sample for connecting to Google Cloud IoT Core via MQTT, using JWT.
-This example connects to Google Cloud IoT Core via MQTT, using a JWT for device
-authentication. After connecting, by default the device publishes 100 messages
-to the device's MQTT topic at a rate of one per second, and then exits.
-Before you run the sample, you must follow the instructions in the README
-for this sample.
-"""
 
 # [START iot_mqtt_includes]
 import argparse
@@ -34,16 +27,14 @@ import jwt
 import paho.mqtt.client as mqtt
 # [END iot_mqtt_includes]
 
-import googlemaps
-from googlemaps.convert import decode_polyline, encode_polyline
 import json
 # from datetime import datetime
 import math
 import numpy
 from collections import OrderedDict
 import sys
-
-logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.CRITICAL)
+import psutil
+from bluetooth import *
 
 # The initial backoff time after a disconnection occurs, in seconds.
 minimum_backoff_time = 1
@@ -54,6 +45,7 @@ MAXIMUM_BACKOFF_TIME = 3#32
 # Whether to wait with exponential backoff before publishing.
 should_backoff = False
 
+bt_data_xfer = False
 
 # [START iot_mqtt_jwt]
 def create_jwt(project_id, private_key_file, algorithm):
@@ -265,24 +257,13 @@ def parse_command_line_args():
             '--service_account_json',
             default=os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"),
             help='Path to service account json file.')
-    parser.add_argument(
-            '--asset_route',
-            default='r1',
-            help='geo coordinates of routes')
-    parser.add_argument(
-            '--maps_api_key',
-            default='api-Key',
-            help='enter the api key as per your user account from google')
 
-            
-
-                
     # Command subparser
     command = parser.add_subparsers(dest='command')
 
     command.add_parser(
         'device_demo',
-        help=mqtt_device_demo.__doc__)
+        help=mqtt_device.__doc__)
 
     return parser.parse_args()
 
@@ -319,105 +300,86 @@ def _round_up_time(time, period):
     time = round(time)
     return time + period - (time % period)
 
-def _fill_missing_times(times, lats, lngs, period):
-    start_time = times[0]
-    end_time = times[-1]
-    
-    # for i in range(max(int(X), int(Y))**2):
-    new_times = range(int(start_time), int(end_time + 1), period)
-    new_lats = numpy.interp(new_times, times, lats).tolist()
-    new_lngs = numpy.interp(new_times, times, lngs).tolist()
-
-    return new_times, new_lats, new_lngs
-
-def get_points_along_path(maps_api_key, _from, _to, departure_time=None, period=5):
-    """
-    Generates a series of points along the route, such that it would take approx `period` seconds to travel between consecutive points
-    
-    This function is primarily meant to simulate a car along a route. The output of this function is equivalent to the geo coordinates 
-    of the car every 5 seconds (assuming period = 5)
-    
-    _from = human friendly from address that google maps can understand
-    _to = human friendly to address that google maps can understand
-    departure_time - primarily used to identify traffic model, defaults to current time
-    period = how frequently should co-ordinates be tracked? Defaults to 5 seconds
-
-    The output is an OrderedDict. Key is the time in seconds since trip start, value is a tuple representing (lat, long) in float
-
-    >>> python vehicles.py "hashedin technologies, bangalore" "cubbon park"
-    """
-    if not departure_time:
-        departure_time = datetime.datetime.now()
-
-    gmaps = googlemaps.Client(key=maps_api_key)
-    directions = gmaps.directions(_from, _to, departure_time=departure_time)
-    
-    steps = directions[0]['legs'][0]['steps']
-    all_lats = []
-    all_lngs = []
-    all_times = []
-
-    step_start_duration = 0
-    step_end_duration = 0
-
-    for step in steps:
-        step_end_duration += step['duration']['value']
-        points = decode_polyline(step['polyline']['points'])
-        distances = []
-        lats = []
-        lngs = []
-        start = None
-        for point in points:
-            if not start:
-                start = point
-                distance = 0
-            else:
-                distance = _calculate_distance(start, point)
-            distances.append(distance)
-            lats.append(point['lat'])
-            lngs.append(point['lng'])
-            
-        missing_times = numpy.interp(distances[1:-1], [distances[0], distances[-1]], [step_start_duration, step_end_duration]).tolist()
-        times = [step_start_duration] + missing_times + [step_end_duration]
-        times = [_round_up_time(t, period) for t in times]
+def input_and_send():
+    print("\nType something\n")
+    while True:
+        data = input()
+        if len(data) == 0: break
+        sock.send(data)
+        sock.send("\n")
         
-        times, lats, lngs = _fill_missing_times(times, lats, lngs, period)
+def rx_and_echo(sock):
+    sock.send("\nsend anything\n")
+    try:
+        while True:
+            data = sock.recv(buf_size)
+            if data:
+                print(data)
+                sock.send(data)
+    except Exception as err:
+        print(err)
+
+def setup_bt_conn():
+    #MAC address of ESP32
+    addr = "80:7D:3A:C5:02:6A"
+    #uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
+    #service_matches = find_service( uuid = uuid, address = addr )
+    service_matches = find_service( address = addr )
+
+
+    if len(service_matches) == 0:
+        print("couldn't find the SampleServer service =(")
+        sys.exit(0)
+
+    for s in range(len(service_matches)):
+        print("\nservice_matches: [" + str(s) + "]:")
+        print(service_matches[s])
         
-        all_lats += lats
-        all_lngs += lngs
-        all_times += times
+    first_match = service_matches[0]
+    port = first_match["port"]
+    name = first_match["name"]
+    host = first_match["host"]
 
-        step_start_duration = step_end_duration
+    port=1
+    print("connecting to \"%s\" on %s, port %s" % (name, host, port))
 
-    points = OrderedDict()
-    for p in zip(all_times, all_lats,all_lngs):
-        points[p[0]] = (round(p[1], 5), round(p[2],5))
-        
-    return points
+    # Create the client socket
+    sock=BluetoothSocket(RFCOMM)
+    sock.connect((host, port))
 
-def generate_polyline(points):
-    return encode_polyline(points.values())   
+    print("connected")
 
-def mqtt_device_demo(args, points):
+    return sock
+
+def mqtt_device(args, points, sock):
     """Connects a device, sends data, and receives data."""
     # [START iot_mqtt_run]
     global minimum_backoff_time
     global MAXIMUM_BACKOFF_TIME
 
     # Publish to the events or state topic based on the flag.
-    sub_topic = 'events' if args.message_type == 'event' else 'state'
+    sub_topic = 'events' if args['message_type'] == 'event' else 'state'
 
-    mqtt_topic = '/devices/{}/{}'.format(args.device_id, sub_topic)
+    mqtt_topic = '/devices/{}/{}'.format(args['device_id'], sub_topic)
 
     jwt_iat = datetime.datetime.utcnow()
-    jwt_exp_mins = args.jwt_expires_minutes
+    jwt_exp_mins = args['jwt_expires_minutes']
     client = get_client(
-        args.project_id, args.cloud_region, args.registry_id,
-        args.device_id, args.private_key_file, args.algorithm,
-        args.ca_certs, args.mqtt_bridge_hostname, args.mqtt_bridge_port)
+        args['project_id'], args['cloud_region'], args['registry_id'],
+        args['device_id'], args['private_key_file'], args['algorithm'],
+        args['ca_certs'], args['mqtt_bridge_hostname'], args['mqtt_bridge_port'])
+
+    buf_size = 1024;
+    # 0: NoLeak, 1: Leak, 2: SensorOffline
+    gas_sensor_status = 0
+
+    try:
+        sock.send("\n Initiat BT start data \n")
+    except Exception as err:
+        gas_sensor_status = 2
 
     # Publish num_messages messages to the MQTT bridge once per second.
-    for i in range(1, args.num_messages + 1):
+    for i in range(1, args['num_messages'] + 1):
         # Process network events.
         client.loop()
 
@@ -433,28 +395,43 @@ def mqtt_device_demo(args, points):
             print('Waiting for {} before reconnecting.'.format(delay))
             time.sleep(delay)
             minimum_backoff_time += 2
-            client.connect(args.mqtt_bridge_hostname, args.mqtt_bridge_port)
+            client.connect(args['mqtt_bridge_hostname'], args['mqtt_bridge_port'])
 
+        
         max_coords = len(points)
         cur_index = i+1 if i+1 < max_coords else max_coords-1
         lat = points[cur_index][0]
         longitude = points[cur_index][1]
-        # payload = '{}/{}-{}-{}-{}'.format(args.registry_id, args.device_id, lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
-        payload = {"timestamp": time.asctime( time.localtime(time.time())),"registry":args.registry_id , "device": args.device_id, "latitude": lat, "longitude": longitude}                
-        print('Publishing message {}/{}: \'{}\''.format(
-                i, args.num_messages, payload))
+        
+        #curr_cpu_temp = psutil.sensors_temperatures()['cpu_thermal'][0][1]
+
+        try:
+            data = sock.recv(buf_size)
+            if data:
+                if(str(data).lower().find('gas leakage') != -1):
+                    gas_sensor_status = 1
+                elif(str(data).lower().find('no gas') != -1):
+                    gas_sensor_status = 0
+                sock.send(data)
+        except Exception as err:
+            gas_sensor_status = 2
+            
+        # payload = '{}/{}-{}-{}-{}'.format(args['registry_id'], args['device_id'], lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
+        payload = {"timestamp": time.asctime( time.localtime(time.time())),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}                
+        print('Publishing message {}/{}: \'{}\''.format(i, args['num_messages'], payload))
+
         # [START iot_mqtt_jwt_refresh]
         seconds_since_issue = (datetime.datetime.utcnow() - jwt_iat).seconds
-        if seconds_since_issue > 3 * jwt_exp_mins:
+        if seconds_since_issue > 4 * jwt_exp_mins:
             print('Refreshing token after {}s'.format(seconds_since_issue))
             jwt_iat = datetime.datetime.utcnow()
             client.loop()
             client.disconnect()
             client = get_client(
-                args.project_id, args.cloud_region,
-                args.registry_id, args.device_id, args.private_key_file,
-                args.algorithm, args.ca_certs, args.mqtt_bridge_hostname,
-                args.mqtt_bridge_port)
+                args['project_id'], args['cloud_region'],
+                args['registry_id'], args['device_id'], args['private_key_file'],
+                args['algorithm'], args['ca_certs'], args['mqtt_bridge_hostname'],
+                args['mqtt_bridge_port'])
         # [END iot_mqtt_jwt_refresh]
         # Publish "payload" to the MQTT topic. qos=1 means at least once
         # delivery. Cloud IoT Core also supports qos=0 for at most once
@@ -462,78 +439,36 @@ def mqtt_device_demo(args, points):
         client.publish(mqtt_topic, json.dumps(payload), qos=1)
 
         # Send events every second. State should not be updated as often
-        for i in range(0, 3):
-            time.sleep(1)
+        for i in range(0, 2):
+            time.sleep(0.1)
             client.loop()
+        
+        if gas_sensor_status == 2:
+            try:
+                print(" BT reconnection attempt ")
+                sock = setup_bt_conn()
+            except:
+                print(" BT reconnection attempt failure ")
     # [END iot_mqtt_run]
 
 
 def main():
-    args = parse_command_line_args()    
+    #args = parse_command_line_args()    
 
-    maps_api_key = args.maps_api_key #ENTER YOUR API KEY FROM GOOGLE MAPS
-    
-    src = ''
-    dest = ''
+    kphb_lat = round(17.502042, 5)
+    kpbh_long = round(78.3947595, 5)
 
-    asset_route = args.asset_route.strip()
-    if asset_route.find("r1") != -1:
-        src = "HashedIn Technologies, Bangalore"
-        dest = "Cubbon Park, Bangalore"
-    elif asset_route.find("r2") != -1:
-        src = "Indiranagar Metro Station, Bangalore"
-        dest = "PVR koramangala, Bangalore"
-    elif asset_route.find("r3") != -1:
-        src = "Tin Factory, Swami Vivekananda Rd, Bangalore"
-        dest = "Capgemini Prestige Shantiniketan Crescent 2, Bangalore"
-    elif asset_route.find("r4") != -1:
-        src = "Shivaji Military Hotel, No. 718, Bangalore"
-        dest = "Silk board bus stand, Central Silk Board Colony, Bangalore"
-
-
-    points = get_points_along_path(maps_api_key, src, dest)
-
-    print("List of points along the route")
-    print("------------------------------")
     coords = []
-    for time, geo in points.items():
-        coords.append(geo)
-        # print(time, geo)
+    coords.append((kphb_lat, kpbh_long))
 
-    print(coords)
+    #print(coords)
 
-    print("Polyline for this route")
-    polyline = generate_polyline(points)
-    print(polyline)
+    args = {'algorithm': 'RS256', 'ca_certs': 'roots.pem', 'cloud_region': 'us-central1', 'data': 'Hello there', 'device_id': 'gas1', 'gateway_id': None, 'jwt_expires_minutes': 20, 'listen_dur': 60, 'message_type': 'event', 'mqtt_bridge_hostname': 'mqtt.googleapis.com', 'mqtt_bridge_port': 8883, 'num_messages': 1000, 'private_key_file': 'rsa_private.pem', 'project_id': 'nsha-usa-utilities-demo', 'registry_id': 'iotlab-registry', 'service_account_json': None, 'command': None}
+    sock = setup_bt_conn()
+    mqtt_device(args, coords, sock)
 
-    mqtt_device_demo(args, coords)
     print('Finished.')
 
 
 if __name__ == '__main__':
     main()
-
-
-#--------------------------------
-'''
-
-export PROJECT_ID=infringement-100
-export MY_REGION=us-central1
-
-
-python3 iot_device_simulator_gps.py \
-   --project_id=$PROJECT_ID \
-   --cloud_region=$MY_REGION \
-   --registry_id=iotlab-registry \
-   --device_id=tempDevice \
-   --private_key_file=rsa_private.pem \
-   --message_type=event \
-   --mqtt_bridge_port=8883 \
-   --algorithm=RS256 --num_messages=1000 --asset_route=r1 --maps_api_key=KEY_VALUE
-
-   or
-
-python3 iot_device_simulator_gps.py --project_id=$PROJECT_ID --cloud_region=$MY_REGION --registry_id=iotlab-registry --device_id=tempDevice --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000 --asset_route=r1 --maps_api_key=KEY_VALUE 
-'''
-
-#--------------------------------

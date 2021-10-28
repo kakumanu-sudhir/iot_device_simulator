@@ -373,6 +373,11 @@ def mqtt_device(args, points, sock):
     # 0: NoLeak, 1: Leak, 2: SensorOffline
     gas_sensor_status = 0
 
+    try:
+        sock.send("\n Initiat BT start data \n")
+    except Exception as err:
+        gas_sensor_status = 2
+
     # Publish num_messages messages to the MQTT bridge once per second.
     for i in range(1, args.num_messages + 1):
         # Process network events.
@@ -399,11 +404,6 @@ def mqtt_device(args, points, sock):
         longitude = points[cur_index][1]
         
         #curr_cpu_temp = psutil.sensors_temperatures()['cpu_thermal'][0][1]
-
-        try:
-            sock.send("\nsend anything\n")
-        except Exception as err:
-            gas_sensor_status = 2
 
         try:
             data = sock.recv(buf_size)
@@ -439,9 +439,16 @@ def mqtt_device(args, points, sock):
         client.publish(mqtt_topic, json.dumps(payload), qos=1)
 
         # Send events every second. State should not be updated as often
-        for i in range(0, 4):
-            time.sleep(3)
+        for i in range(0, 2):
+            time.sleep(0.1)
             client.loop()
+        
+        if gas_sensor_status == 2:
+            try:
+                print(" BT reconnection attempt ")
+                sock = setup_bt_conn()
+            except:
+                print(" BT reconnection attempt failure ")
     # [END iot_mqtt_run]
 
 #https://www.google.com/maps/@17.502042,78.3947595,19.23z
@@ -472,22 +479,20 @@ if __name__ == '__main__':
 #--------------------------------
 '''
 
-export PROJECT_ID=cloud-arch-326918
+export PROJECT_ID=nsha-usa-utilities-demo
 export MY_REGION=us-central1
 
 
-python3 iot_device_simulator_gps.py \
+python3 iot_device_rpi_bt.py \
    --project_id=$PROJECT_ID \
    --cloud_region=$MY_REGION \
    --registry_id=iotlab-registry \
-   --device_id=tempDevice \
+   --device_id=gas1 \
    --private_key_file=rsa_private.pem \
    --message_type=event \
    --mqtt_bridge_port=8883 \
    --algorithm=RS256 --num_messages=1000
 
-   or
-
-python3 iot_device_simulator_gps.py --project_id=$PROJECT_ID --cloud_region=$MY_REGION --registry_id=iotlab-registry --device_id=tempDevice --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000
+python3 iot_device_rpi_bt.py --project_id=$PROJECT_ID --cloud_region=$MY_REGION --registry_id=iotlab-registry --device_id=gas1 --private_key_file=rsa_private.pem --message_type=event  --mqtt_bridge_port=8883 --algorithm=RS256 --num_messages=1000
 '''
 #--------------------------------
