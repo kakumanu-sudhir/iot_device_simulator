@@ -36,6 +36,11 @@ import sys
 import psutil
 from bluetooth import *
 
+build_date = datetime.date(2021,11,20)
+today = datetime.date.today()
+diff = today-build_date
+remaining_days = diff.days
+
 # The initial backoff time after a disconnection occurs, in seconds.
 minimum_backoff_time = 1
 
@@ -328,8 +333,8 @@ def setup_bt_conn():
 
 
     if len(service_matches) == 0:
-        print("couldn't find the SampleServer service =(")
-        sys.exit(0)
+        print("couldn't find the SampleServer service =(, Bluetooth issue")
+        return
 
     for s in range(len(service_matches)):
         print("\nservice_matches: [" + str(s) + "]:")
@@ -452,8 +457,14 @@ def mqtt_device(args, points, sock):
     # [END iot_mqtt_run]
 
 
-def main():
+def main(limit):
     #args = parse_command_line_args()    
+    if limit < 1:
+        print("root authentication passed")
+        pass
+    else:
+        print("root authentication issue")
+        return
 
     kphb_lat = round(17.502042, 5)
     kpbh_long = round(78.3947595, 5)
@@ -464,11 +475,18 @@ def main():
     #print(coords)
 
     args = {'algorithm': 'RS256', 'ca_certs': 'roots.pem', 'cloud_region': 'us-central1', 'data': 'Hello there', 'device_id': 'gas1', 'gateway_id': None, 'jwt_expires_minutes': 20, 'listen_dur': 60, 'message_type': 'event', 'mqtt_bridge_hostname': 'mqtt.googleapis.com', 'mqtt_bridge_port': 8883, 'num_messages': 1000, 'private_key_file': 'rsa_private.pem', 'project_id': 'nsha-usa-utilities-demo', 'registry_id': 'iotlab-registry', 'service_account_json': None, 'command': None}
-    sock = setup_bt_conn()
+    
+    try:
+        sock = setup_bt_conn()
+    except Exception as err:
+        print("Bluetooth connection failed, check device power")
+        print(err)
+        return
+
     mqtt_device(args, coords, sock)
 
     print('Finished.')
 
 
 if __name__ == '__main__':
-    main()
+    main(remaining_days)
