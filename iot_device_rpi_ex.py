@@ -376,12 +376,12 @@ def mqtt_device(args, points, sock):
 
     buf_size = 1024;
     # 0: NoLeak, 1: Leak, 2: SensorOffline
-    gas_sensor_status = 0
+    gas_sensor_status = 1
 
     try:
         sock.send("\n Initiat BT start data \n")
     except Exception as err:
-        gas_sensor_status = 2
+        gas_sensor_status = 3
 
     # Publish num_messages messages to the MQTT bridge once per second.
     for i in range(1, args['num_messages'] + 1):
@@ -414,12 +414,12 @@ def mqtt_device(args, points, sock):
             data = sock.recv(buf_size)
             if data:
                 if(str(data).lower().find('gas leakage') != -1):
-                    gas_sensor_status = 1
+                    gas_sensor_status = 2
                 elif(str(data).lower().find('no gas') != -1):
-                    gas_sensor_status = 0
+                    gas_sensor_status = 1
                 sock.send(data)
         except Exception as err:
-            gas_sensor_status = 2
+            gas_sensor_status = 3
             
         # payload = '{}/{}-{}-{}-{}'.format(args['registry_id'], args['device_id'], lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
         payload = {"timestamp": time.asctime( time.localtime(time.time())),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}                
@@ -448,7 +448,7 @@ def mqtt_device(args, points, sock):
             time.sleep(0.1)
             client.loop()
         
-        if gas_sensor_status == 2:
+        if gas_sensor_status == 3:
             try:
                 print(" BT reconnection attempt ")
                 sock = setup_bt_conn()
