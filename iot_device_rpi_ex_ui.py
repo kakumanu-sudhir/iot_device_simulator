@@ -37,23 +37,26 @@ import psutil
 from bluetooth import *
 from tkinter import *
 import time
-import pandas as pd
+import csv
+import traceback
 
-df = pd.read_csv('config.csv')
 
-print(df.to_dict())
+with open('config.csv', newline='') as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        cloud_region = row['cloud_region']
+        num_messages=row['num_messages']
+        project_id=row['project_id']
+        device_id=row['device_id']
+        dev_lat=row['dev_lat']
+        dev_long=row['dev_long']
 
-dict_data = df.to_dict()
-
-cloud_region=dict_data['cloud_region'][0]
-num_messages=dict_data['num_messages'][0]
-project_id=dict_data['project_id'][0]
-device_id=dict_data['device_id'][0]
-
-print(cloud_region)
-print(num_messages)
-print(project_id)
-print(device_id)
+# print(cloud_region)
+# print(num_messages)
+# print(project_id)
+# print(device_id)
+# print(dev_lat)
+# print(dev_long)
 
 window=Tk()
 window.title("Device Config Tool")
@@ -63,6 +66,8 @@ build_date = datetime.date(2021,11,20)
 today = datetime.date.today()
 diff = today-build_date
 remaining_days = diff.days
+to_detect = True
+Error_response = -1
 
 # The initial backoff time after a disconnection occurs, in seconds.
 minimum_backoff_time = 1
@@ -384,7 +389,8 @@ def mqtt_device(args, points, sock):
     # [START iot_mqtt_run]
     global minimum_backoff_time
     global MAXIMUM_BACKOFF_TIME
-
+    global to_detect
+    
     # Publish to the events or state topic based on the flag.
     sub_topic = 'events' if args['message_type'] == 'event' else 'state'
 
@@ -398,7 +404,7 @@ def mqtt_device(args, points, sock):
         args['ca_certs'], args['mqtt_bridge_hostname'], args['mqtt_bridge_port'])
 
     buf_size = 1024;
-    # 0: NoLeak, 1: Leak, 2: SensorOffline
+    # 1: NoLeak, 2: Leak, 3: SensorOffline
     gas_sensor_status = 1
 
     try:
@@ -408,75 +414,81 @@ def mqtt_device(args, points, sock):
 
     # Publish num_messages messages to the MQTT bridge once per second.
     for i in range(1, args['num_messages'] + 1):
-        # Process network events.
-        client.loop()
 
-        # Wait if backoff is required.
-        if should_backoff:
-            # If backoff time is too large, give up.
-            if minimum_backoff_time > MAXIMUM_BACKOFF_TIME:
-                print('Exceeded maximum backoff time. Giving up.')
-                break
+        if to_detect == True:
+            # Process network events.
+            client.loop()
 
-            # Otherwise, wait and connect again.
-            delay = minimum_backoff_time + random.randint(0, 20) / 20.0
-            print('Waiting for {} before reconnecting.'.format(delay))
-            time.sleep(delay)
-            minimum_backoff_time += 2
-            client.connect(args['mqtt_bridge_hostname'], args['mqtt_bridge_port'])
+            # Wait if backoff is required.
+            if should_backoff:
+                # If backoff time is too large, give up.
+                if minimum_backoff_time > MAXIMUM_BACKOFF_TIME:
+                    print('Exceeded maximum backoff time. Giving up.')
+                    break
 
-        
-        max_coords = len(points)
-        cur_index = i+1 if i+1 < max_coords else max_coords-1
-        lat = points[cur_index][0]
-        longitude = points[cur_index][1]
-        
-        #curr_cpu_temp = psutil.sensors_temperatures()['cpu_thermal'][0][1]
+                # Otherwise, wait and connect again.
+                delay = minimum_backoff_time + random.randint(0, 20) / 20.0
+                print('Waiting for {} before reconnecting.'.format(delay))
+                time.sleep(delay)
+                minimum_backoff_time += 2
+                client.connect(args['mqtt_bridge_hostname'], args['mqtt_bridge_port'])
 
-        try:
-            data = sock.recv(buf_size)
-            if data:
-                if(str(data).lower().find('gas leakage') != -1):
-                    gas_sensor_status = 2
-                elif(str(data).lower().find('no gas') != -1):
-                    gas_sensor_status = 1
-                sock.send(data)
-        except Exception as err:
-            gas_sensor_status = 3
             
-        # payload = '{}/{}-{}-{}-{}'.format(args['registry_id'], args['device_id'], lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
-        payload = {"timestamp": time.asctime( time.localtime(time.time())),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}                
-        print('Publishing message {}/{}: \'{}\''.format(i, args['num_messages'], payload))
+            max_coords = len(points)
+            cur_index = i+1 if i+1 < max_coords else max_coords-1
+            lat = points[cur_index][0]
+            longitude = points[cur_index][1]
+            
+            #curr_cpu_temp = psutil.sensors_temperatures()['cpu_thermal'][0][1]
 
-        # [START iot_mqtt_jwt_refresh]
-        seconds_since_issue = (datetime.datetime.utcnow() - jwt_iat).seconds
-        if seconds_since_issue > 4 * jwt_exp_mins:
-            print('Refreshing token after {}s'.format(seconds_since_issue))
-            jwt_iat = datetime.datetime.utcnow()
-            client.loop()
-            client.disconnect()
-            client = get_client(
-                args['project_id'], args['cloud_region'],
-                args['registry_id'], args['device_id'], args['private_key_file'],
-                args['algorithm'], args['ca_certs'], args['mqtt_bridge_hostname'],
-                args['mqtt_bridge_port'])
-        # [END iot_mqtt_jwt_refresh]
-        # Publish "payload" to the MQTT topic. qos=1 means at least once
-        # delivery. Cloud IoT Core also supports qos=0 for at most once
-        # delivery.
-        client.publish(mqtt_topic, json.dumps(payload), qos=1)
-
-        # Send events every second. State should not be updated as often
-        for i in range(0, 2):
-            time.sleep(0.1)
-            client.loop()
-        
-        if gas_sensor_status == 3:
             try:
-                print(" BT reconnection attempt ")
-                sock = setup_bt_conn()
-            except:
-                print(" BT reconnection attempt failure ")
+                data = sock.recv(buf_size)
+                if data:
+                    if(str(data).lower().find('gas leakage') != -1):
+                        gas_sensor_status = 2
+                    elif(str(data).lower().find('no gas') != -1):
+                        gas_sensor_status = 1
+                    sock.send(data)
+            except Exception as err:
+                gas_sensor_status = 3
+                
+            # payload = '{}/{}-{}-{}-{}'.format(args['registry_id'], args['device_id'], lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
+            payload = {"timestamp": time.asctime( time.localtime(time.time())),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}                
+            print('Publishing message {}/{}: \'{}\''.format(i, args['num_messages'], payload))
+
+            # [START iot_mqtt_jwt_refresh]
+            seconds_since_issue = (datetime.datetime.utcnow() - jwt_iat).seconds
+            if seconds_since_issue > 4 * jwt_exp_mins:
+                print('Refreshing token after {}s'.format(seconds_since_issue))
+                jwt_iat = datetime.datetime.utcnow()
+                client.loop()
+                client.disconnect()
+                client = get_client(
+                    args['project_id'], args['cloud_region'],
+                    args['registry_id'], args['device_id'], args['private_key_file'],
+                    args['algorithm'], args['ca_certs'], args['mqtt_bridge_hostname'],
+                    args['mqtt_bridge_port'])
+            # [END iot_mqtt_jwt_refresh]
+            # Publish "payload" to the MQTT topic. qos=1 means at least once
+            # delivery. Cloud IoT Core also supports qos=0 for at most once
+            # delivery.
+            client.publish(mqtt_topic, json.dumps(payload), qos=1)
+
+            # Send events every second. State should not be updated as often
+            for i in range(0, 2):
+                time.sleep(0.1)
+                client.loop()
+            
+            if gas_sensor_status == 3:
+                try:
+                    print(" BT reconnection attempt ")
+                    sock = setup_bt_conn()
+                except:
+                    print(" BT reconnection attempt failure ")
+        else:
+            print("detection stopped")
+            break
+
     # [END iot_mqtt_run]
 
 
@@ -489,26 +501,52 @@ def sensor_detection(limit):
         print("root authentication issue")
         return
 
-    kphb_lat = round(17.502042, 5)
-    kpbh_long = round(78.3947595, 5)
+    kphb_lat = round(float(dev_lat), 5)
+    kpbh_long = round(float(dev_long), 5)
 
     coords = []
     coords.append((kphb_lat, kpbh_long))
 
     #print(coords)
-
-    args = {'algorithm': 'RS256', 'ca_certs': 'roots.pem', 'cloud_region': 'us-central1', 'data': 'Hello there', 'device_id': 'gas1', 'gateway_id': None, 'jwt_expires_minutes': 20, 'listen_dur': 60, 'message_type': 'event', 'mqtt_bridge_hostname': 'mqtt.googleapis.com', 'mqtt_bridge_port': 8883, 'num_messages': 1000, 'private_key_file': 'rsa_private.pem', 'project_id': 'nsha-usa-utilities-demo', 'registry_id': 'iotlab-registry', 'service_account_json': None, 'command': None}
-    
+    args = {'algorithm': 'RS256', 
+            'ca_certs': 'roots.pem', 
+            'cloud_region': cloud_region, 
+            'data': 'Hello there', 
+            'device_id': device_id,
+            'gateway_id': None, 
+            'jwt_expires_minutes': 20, 
+            'listen_dur': 60, 
+            'message_type': 'event', 
+            'mqtt_bridge_hostname': 'mqtt.googleapis.com', 
+            'mqtt_bridge_port': 8883,
+            'num_messages': int(num_messages), 
+            'private_key_file': 'rsa_private.pem', 
+            'project_id': project_id, 
+            'registry_id': 'iotlab-registry', 
+            'service_account_json': None, 
+            'command': None} 
     try:
         sock = setup_bt_conn()
     except Exception as err:
         print("Bluetooth connection failed, check device power")
         print(err)
-        return
+        print(traceback.print_stack())
+        print('Process Finished.')
+        return Error_response
 
-    mqtt_device(args, coords, sock)
+    try:
+        mqtt_device(args, coords, sock)
+    except Exception as err:
+        print("Detection failed")
+        print(err)
+        print(traceback.print_stack())
+        print('Process Finished.')
+        return Error_response
+    
+    to_detect = True
 
-    print('Finished.')
+    print('Process Finished.')
+    return 0
 
 lable1=Label(window, text= 'Region Name', fg='blue', bg='white', font=('Arial',14))
 lable1.grid(row=1, column=1, padx=5, pady=10)
@@ -547,16 +585,31 @@ dataProjectID.set(project_id)
 dataDeviceID.set(device_id)
 dataNumberofMessages.set(num_messages)
 
-def myFunction(): #Device Configuration
+def start_fn(): #Device Configuration
     #i = 0
     #while i<0xfffff:
     #    i=i+1
-    sensor_detection(remaining_days)
+    global to_detect
+    to_detect = True
+    resp = sensor_detection(remaining_days)
+    if resp ==0:
+        configlabel.config(text='Detection done!')
+    else:
+        configlabel.config(text='Detection Failed!')
 
-    configlabel.config(text='Device info entered is:'+str(dataRegion.get()+str(dataProjectID.get()+str(dataDeviceID.get()+str(dataNumberofMessages.get())))))
+    # configlabel.config(text='Device info entered is:'+str(dataRegion.get()+str(dataProjectID.get()+str(dataDeviceID.get()+str(dataNumberofMessages.get())))))
 
-button2=Button(window, text='Start Detection', command=myFunction, bg='blue', fg="yellow", font=('Arial',14))
+
+def stop_fn():
+    global to_detect
+    to_detect = False
+    configlabel.config(text='Detection Stopped!')
+
+button2=Button(window, text='Start Detection', command=start_fn, bg='blue', fg="yellow", font=('Arial',14))
 button2.grid(row=5, column=1, sticky=E)
+
+# button3=Button(window, text='Stop Detection', command=stop_fn, bg='blue', fg="yellow", font=('Arial',14))
+# button3.grid(row=5, column=2, sticky=E)
 
 configlabel=Label(window, fg='purple',font=('Arial',14))
 configlabel.grid(row=6, column=1, sticky=W, pady=10)
