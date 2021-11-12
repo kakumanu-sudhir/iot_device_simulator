@@ -50,6 +50,7 @@ with open('config.csv', newline='') as csvfile:
         device_id=row['device_id']
         dev_lat=row['dev_lat']
         dev_long=row['dev_long']
+        bt_addr=row['bt_addr']
 
 # print(cloud_region)
 # print(num_messages)
@@ -221,125 +222,17 @@ def attach_device(client, device_id, auth):
     client.publish(attach_topic, attach_payload, qos=1)
     # [END iot_attach_device]
 
-
-def parse_command_line_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description=(
-            'Example Google Cloud IoT Core MQTT device connection code.'))
-    parser.add_argument(
-            '--algorithm',
-            choices=('RS256', 'ES256'),
-            required=True,
-            help='Which encryption algorithm to use to generate the JWT.')
-    parser.add_argument(
-            '--ca_certs',
-            default='roots.pem',
-            help='CA root from https://pki.google.com/roots.pem')
-    parser.add_argument(
-            '--cloud_region', default='us-central1', help='GCP cloud region')
-    parser.add_argument(
-            '--data',
-            default='Hello there',
-            help='The telemetry data sent on behalf of a device')
-    parser.add_argument(
-            '--device_id', required=True, help='Cloud IoT Core device id')
-    parser.add_argument(
-            '--gateway_id', required=False, help='Gateway identifier.')
-    parser.add_argument(
-            '--jwt_expires_minutes',
-            default=20,
-            type=int,
-            help='Expiration time, in minutes, for JWT tokens.')
-    parser.add_argument(
-            '--listen_dur',
-            default=60,
-            type=int,
-            help='Duration (seconds) to listen for configuration messages')
-    parser.add_argument(
-            '--message_type',
-            choices=('event', 'state'),
-            default='event',
-            help=('Indicates whether the message to be published is a '
-                  'telemetry event or a device state message.'))
-    parser.add_argument(
-            '--mqtt_bridge_hostname',
-            default='mqtt.googleapis.com',
-            help='MQTT bridge hostname.')
-    parser.add_argument(
-            '--mqtt_bridge_port',
-            choices=(8883, 443),
-            default=8883,
-            type=int,
-            help='MQTT bridge port.')
-    parser.add_argument(
-            '--num_messages',
-            type=int,
-            default=100,
-            help='Number of messages to publish.')
-    parser.add_argument(
-            '--private_key_file',
-            required=True,
-            help='Path to private key file.')
-    parser.add_argument(
-            '--project_id',
-            default=os.environ.get('GOOGLE_CLOUD_PROJECT'),
-            help='GCP cloud project name')
-    parser.add_argument(
-            '--registry_id', required=True, help='Cloud IoT Core registry id')
-    parser.add_argument(
-            '--service_account_json',
-            default=os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"),
-            help='Path to service account json file.')
-
-    # Command subparser
-    command = parser.add_subparsers(dest='command')
-
-    command.add_parser(
-        'device_demo',
-        help=mqtt_device.__doc__)
-
-    return parser.parse_args()
-
-
-def _calculate_distance(origin, destination):
-    """
-    Calculate the Haversine distance. 
-    This isn't accurate for large distances, but for our purposes it is good enough
-    """
-    lat1, lon1 = origin['lat'], origin['lng']
-    lat2, lon2 = destination['lat'], destination['lng']
-    radius = 6371000  # metres
-
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) * math.sin(dlat / 2) +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlon / 2) * math.sin(dlon / 2))
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    d = radius * c
-
-    return d
-
-def _round_up_time(time, period):
-    """
-    Rounds up time to the higher multiple of period
-    For example, if period=5, then time=16s will be rounded to 20s
-    if time=15, then time will remain 15
-    """
-    # If time is an exact multiple of period, don't round up
-    if time % period == 0:
-        return time
-
-    time = round(time)
-    return time + period - (time % period)
-
 def input_and_send():
     print("\nType something\n")
-    while True:
-        data = input()
-        if len(data) == 0: break
-        sock.send(data)
-        sock.send("\n")
+    try:
+        while True:
+            data = input()
+            if len(data) == 0: 
+                break
+            sock.send(data)
+            sock.send("\n")
+    except Exception as err:
+        print(err)
         
 def rx_and_echo(sock):
     sock.send("\nsend anything\n")
@@ -352,14 +245,10 @@ def rx_and_echo(sock):
     except Exception as err:
         print(err)
 
-def setup_bt_conn():
-    #MAC address of ESP32
-    addr = "80:7D:3A:C5:02:6A"
+def setup_bt_conn(addr):
     #uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
     #service_matches = find_service( uuid = uuid, address = addr )
     service_matches = find_service( address = addr )
-
-
     if len(service_matches) == 0:
         print("couldn't find the SampleServer service =(, Bluetooth issue")
         return
@@ -453,7 +342,7 @@ def mqtt_device(args, points, sock):
                 gas_sensor_status = 3
                 
             # payload = '{}/{}-{}-{}-{}'.format(args['registry_id'], args['device_id'], lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
-            payload = {"timestamp": time.asctime( time.localtime(time.time())),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}                
+            payload = {"time_stamp": time.asctime( time.localtime(time.time())),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}                
             print('Publishing message {}/{}: \'{}\''.format(i, args['num_messages'], payload))
 
             # [START iot_mqtt_jwt_refresh]
@@ -525,8 +414,12 @@ def sensor_detection(limit):
             'registry_id': 'iotlab-registry', 
             'service_account_json': None, 
             'command': None} 
+    
+    #MAC address of ESP32
+    #addr = "80:7D:3A:C5:02:6A"
+
     try:
-        sock = setup_bt_conn()
+        sock = setup_bt_conn(bt_addr)
     except Exception as err:
         print("Bluetooth connection failed, check device power")
         print(err)

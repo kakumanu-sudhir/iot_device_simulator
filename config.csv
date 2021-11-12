@@ -1,2 +1,2 @@
-cloud_region,num_messages,project_id,device_id,dev_lat,dev_long
-us-central1,1000,nsha-usa-utilities-demo,sensor1,17.502042,78.3947595
+cloud_region,num_messages,project_id,device_id,dev_lat,dev_long,bt_addr
+us-central1,100,nsha-usa-utilities-demo,sensor1,17.502042,78.3947595,80:7D:3A:C5:02:6A
