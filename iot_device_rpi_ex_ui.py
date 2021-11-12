@@ -372,7 +372,7 @@ def mqtt_device(args, points, sock):
             if gas_sensor_status == 3:
                 try:
                     print(" BT reconnection attempt ")
-                    sock = setup_bt_conn()
+                    sock = setup_bt_conn(args['bt_addr'])
                 except:
                     print(" BT reconnection attempt failure ")
         else:
@@ -414,7 +414,8 @@ def sensor_detection(limit):
             'project_id': project_id, 
             'registry_id': 'iotlab-registry', 
             'service_account_json': None, 
-            'command': None} 
+            'command': None,
+            'bt_addr':bt_addr} 
     
     #MAC address of ESP32
     #addr = "80:7D:3A:C5:02:6A"
