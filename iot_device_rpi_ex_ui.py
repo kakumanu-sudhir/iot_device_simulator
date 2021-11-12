@@ -28,7 +28,6 @@ import paho.mqtt.client as mqtt
 # [END iot_mqtt_includes]
 
 import json
-# from datetime import datetime
 import math
 import numpy
 from collections import OrderedDict
@@ -340,9 +339,11 @@ def mqtt_device(args, points, sock):
                     sock.send(data)
             except Exception as err:
                 gas_sensor_status = 3
-                
+            
+            c_dt = datetime.datetime.now()
             # payload = '{}/{}-{}-{}-{}'.format(args['registry_id'], args['device_id'], lat, longitude, i) # Publishing message 100/1000: 'iotlab-registry/tempDevice-12.91833-77.62187-100'
-            payload = {"time_stamp": time.asctime( time.localtime(time.time())),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}                
+            #payload = {"time_stamp": time.asctime( time.localtime(time.time())),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}                
+            payload = {"time_stamp": c_dt.strftime("%Y-%m-%d %H:%M:%S"),"registry":args['registry_id'] , "device": args['device_id'], "latitude": lat, "longitude": longitude, "gas_sensor_status": gas_sensor_status}
             print('Publishing message {}/{}: \'{}\''.format(i, args['num_messages'], payload))
 
             # [START iot_mqtt_jwt_refresh]
