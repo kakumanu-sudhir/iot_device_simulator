@@ -5,7 +5,7 @@ block_cipher = None
 
 
 a = Analysis(
-    ['iot_device_rpi_ex_ui.py'],
+    ['iot_device_rpi_ui_async.py'],
     pathex=[],
     binaries=[],
     datas=[],
