@@ -241,7 +241,7 @@ def rx_and_echo(sock):
     except Exception as err:
         print(err)
 
-async def setup_bt_conn(addr):
+def setup_bt_conn(addr):
     #uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
     #service_matches = find_service( uuid = uuid, address = addr )
     print("setup_bt_conn")
@@ -457,6 +457,7 @@ def sensor_detection(limit):
 
 async def start_fn(configlabel): #Device Configuration
     print("start_fn")
+    configlabel.config(text='Detection Started!')    
     global to_detect
     to_detect = True
     resp = sensor_detection(remaining_days)
@@ -469,7 +470,6 @@ async def start_fn(configlabel): #Device Configuration
 
 def _asyncio_thread(async_loop, configlabel):
     print("_asyncio_thread")
-
     try:
         async_loop.run_until_complete(start_fn(configlabel))
     except Exception as err:
@@ -486,14 +486,12 @@ def _asyncio_thread(async_loop, configlabel):
 def do_tasks(async_loop, configlabel):
     """ Button-Event-Handler starting the asyncio part. """
     print("do_tasks")
-    configlabel.config(text='Detection Started!')
     worker = threading.Thread(target=_asyncio_thread, args=(async_loop,configlabel, ))
     worker.start()
     # async_loop.run_until_complete(start_fn(configlabel))
     print("do_tasks done")
 
 def stop_fn(async_loop, configlabel):
-    configlabel.config(text='Detection Stopping!')
     global to_detect
     to_detect = False
     async_loop.stop()
