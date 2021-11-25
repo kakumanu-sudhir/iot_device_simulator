@@ -59,7 +59,7 @@ with open('config.csv', newline='') as csvfile:
 # print(dev_lat)
 # print(dev_long)
 
-build_date = datetime.date(2021,11,20)
+build_date = datetime.date(2021,11,30)
 today = datetime.date.today()
 diff = today-build_date
 remaining_days = diff.days
@@ -331,7 +331,11 @@ def mqtt_device(args, points, sock):
             try:
                 data = sock.recv(buf_size)
                 if data:
-                    if(str(data).lower().find('gas leakage') != -1):
+                    if(str(data).lower().find('no vibration') != -1):
+                        gas_sensor_status = 5
+                    elif(str(data).lower().find('vibration detected') != -1):
+                        gas_sensor_status = 4
+                    elif(str(data).lower().find('gas leakage') != -1):
                         gas_sensor_status = 2
                     elif(str(data).lower().find('no gas') != -1):
                         gas_sensor_status = 1
