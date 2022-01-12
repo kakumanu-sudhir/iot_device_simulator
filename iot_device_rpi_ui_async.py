@@ -59,7 +59,7 @@ with open('config.csv', newline='') as csvfile:
 # print(dev_lat)
 # print(dev_long)
 
-build_date = datetime.date(2021,12,15)
+build_date = datetime.date(2022,1,25)
 today = datetime.date.today()
 diff = today-build_date
 remaining_days = diff.days
