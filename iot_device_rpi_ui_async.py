@@ -59,7 +59,7 @@ with open('config.csv', newline='') as csvfile:
 # print(dev_lat)
 # print(dev_long)
 
-build_date = datetime.date(2022,1,25)
+build_date = datetime.date(2022,2,12)
 today = datetime.date.today()
 diff = today-build_date
 remaining_days = diff.days
@@ -392,7 +392,7 @@ def sensor_detection(limit):
         print("root authentication passed")
         pass
     else:
-        print("root authentication issue")
+        print("device sync error")
         return
 
     kphb_lat = round(float(dev_lat), 5)
